@@ -76,6 +76,19 @@ function Board(stage) {
             this.ballMatrix[i] = new Array(numCells);
         }
         
+        // Place first balls
+        var count = numStartBalls;
+        while(count > 0){
+          var x = Math.floor(Math.random()*numCells);
+          var y = Math.floor(Math.random()*numCells);
+          if(this.ballMatrix[x][y] != null){
+            continue;
+          }
+          
+          var color = Math.floor(Math.random()*numBallTypes);
+          this.addBall(x,y, color);
+          count = count - 1;
+        }
         
     }
 
