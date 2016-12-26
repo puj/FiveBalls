@@ -65,7 +65,7 @@ function Board(stage) {
         for (var i = 0; i < numCells; i++) {
             this.tileMatrix = new Array(numCells);
             for (var j = 0; j < numCells; j++) {
-              this.addTile(i,j);
+                this.addTile(i, j);
             }
         }
 
@@ -108,16 +108,18 @@ function Board(stage) {
         ballSprite.x = this.getCoordsForCell(x, y)[0];
         ballSprite.y = this.getCoordsForCell(x, y)[1];
         ballSprite.tint = colorMap[colorIndex];
-        var ball = new Ball(x, y, ballSprite);
-
+        var ball = new Ball(x, y, colorIndex, ballSprite);
         this.ballMatrix[x][y] = ball;
         this.stage.addChild(ballSprite);
     }
 
     this.moveBall = function(ball, x, y) {
         var coords = this.getCoordsForCell(x, y);
-        ball.ballSprite.x = coords[0];
-        ball.ballSprite.y = coords[1];
+        ball.sprite.x = coords[0];
+        ball.sprite.y = coords[1];
+        ball.x = x;
+        ball.y = y;
+        this.ballMatrix[x][y] =ball;
     }
 
     this.removeBall = function(ball) {
@@ -129,10 +131,12 @@ function Board(stage) {
     this.tileClicked = function(tile) {
         var ball = this.ballMatrix[tile.x][tile.y];
         if (ball != null) {
-            console.log("From board, ball clicked : " + ball.x + " , " + ball.y);
+            this.selectedBall = ball;
         } else {
-
-            console.log("From board, tiled clicked : " + tile.x + " , " + tile.y);
+            if (this.selectedBall) {
+                this.moveBall(this.selectedBall, tile.x, tile.y);
+                this.selectedBall = null;
+            }
         }
     }
 
@@ -150,10 +154,11 @@ function Tile(x, y, sprite) {
     this.sprite = sprite;
 }
 
-function Ball(x, y, colorIndex) {
+function Ball(x, y, colorIndex, sprite) {
     this.x = x;
     this.y = y;
     this.colorIndex = colorIndex;
+    this.sprite = sprite;
 
     this.onClick = function(mouseEvent) {}
 
