@@ -6,6 +6,8 @@ var numStartBalls = 10;
 var numBallsPerTurn = 3;
 var numBallTypes = 8;
 
+var numTurnsUntilNewBalls = 3;
+
 var colorMap = [
     0xFF0000,
     0xFFAA00,
@@ -22,7 +24,6 @@ function FiveBalls(PIXI) {
     this.PIXI = PIXI;
 
     this.init = function() {
-        console.log("Hey");
         //Create the renderer
         var renderer = PIXI.autoDetectRenderer(256, 256);
         document.body.appendChild(renderer.view);
@@ -60,10 +61,12 @@ function Board(stage) {
     this.ballTexture = new PIXI.Texture.fromImage("static/ball.png")
     this.stage = stage;
     this.selectedBall = null;
+    this.upcomingBallIndices = [];
+    this.numTurns = 0;
     this.init = function() {
         // Init tiles
         for (var i = 0; i < numCells; i++) {
-            this.tileMatrix = new Array(numCells);
+            this.tileMatrix[i] = new Array(numCells);
             for (var j = 0; j < numCells; j++) {
                 this.addTile(i, j);
             }
@@ -75,19 +78,45 @@ function Board(stage) {
         }
 
         // Place first balls
-        var count = numStartBalls;
-        while (count > 0) {
-            var x = Math.floor(Math.random() * numCells);
-            var y = Math.floor(Math.random() * numCells);
-            if (this.ballMatrix[x][y] != null) {
-                continue;
-            }
-
+        var emptyTiles = this.findOpenTiles();
+        var randomEmptyTiles = this.pickNRandomFrom(numStartBalls, emptyTiles);
+        for (var i = 0; i < randomEmptyTiles.length; i++) {
+            var emptyTile = randomEmptyTiles[i];
             var color = Math.floor(Math.random() * numBallTypes);
-            this.addBall(x, y, color);
-            count = count - 1;
+            this.addBall(emptyTile.x, emptyTile.y, color);
         }
 
+        this.createNewUpcoming();
+    }
+
+    this.pickNRandomFrom = function(n, fromThis) {
+        var ret = [];
+        while (ret.length != n) {
+            var randomIndex = Math.floor(Math.random() * fromThis.length);
+            if (ret.indexOf(fromThis[randomIndex]) == -1) {
+                ret.push(fromThis[randomIndex]);
+            }
+        }
+
+        return ret;
+    }
+
+    this.findOpenTiles = function() {
+        var empties = [];
+        for (var i = 0; i < numCells; i++) {
+            for (var j = 0; j < numCells; j++) {
+                if (this.ballMatrix[i][j] == null) {
+                    empties.push(this.tileMatrix[i][j]);
+                }
+            }
+        }
+        return empties;
+    }
+
+    this.createNewUpcoming = function() {
+        for (var i = 0; i < numBallsPerTurn; i++) {
+            this.upcomingBallIndices[i] = Math.floor(Math.random() * numBallTypes);
+        }
     }
 
     this.addTile = function(x, y) {
@@ -101,6 +130,7 @@ function Board(stage) {
             board.tileClicked(tile);
         });
         this.stage.addChild(tileSprite);
+        this.tileMatrix[x][y] = tile;
     }
 
     this.addBall = function(x, y, colorIndex) {
@@ -115,11 +145,12 @@ function Board(stage) {
 
     this.moveBall = function(ball, x, y) {
         var coords = this.getCoordsForCell(x, y);
+        this.ballMatrix[ball.x][ball.y] = null;
         ball.sprite.x = coords[0];
         ball.sprite.y = coords[1];
         ball.x = x;
         ball.y = y;
-        this.ballMatrix[x][y] =ball;
+        this.ballMatrix[x][y] = ball;
     }
 
     this.removeBall = function(ball) {
@@ -136,7 +167,27 @@ function Board(stage) {
             if (this.selectedBall) {
                 this.moveBall(this.selectedBall, tile.x, tile.y);
                 this.selectedBall = null;
+                this.numTurns = this.numTurns + 1;
+                this.checkNextTurnsConditions();
             }
+        }
+    }
+
+    this.checkNextTurnsConditions = function() {
+        // Process 5+ in a row
+        // Get empties
+        var empties = this.findOpenTiles();
+
+        if (this.numTurns % numTurnsUntilNewBalls == 0) {
+            //Add new random balls
+            var randomPlacements = this.pickNRandomFrom(numBallsPerTurn, empties);
+            console.log("Turn " + this.numTurns + " with empties : " + randomPlacements);
+            for (var i = 0; i < this.upcomingBallIndices.length; i++) {
+                var tile = randomPlacements[i];
+                console.log("Adding ball at " + tile.x + ", " + tile.y);
+                this.addBall(tile.x, tile.y, this.upcomingBallIndices[i]);
+            }
+            this.createNewUpcoming();
         }
     }
 
