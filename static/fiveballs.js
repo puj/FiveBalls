@@ -1,6 +1,5 @@
 var numCells = 12;
 var cellSize = 50;
-var borderSize = 50;
 
 var numStartBalls = 10;
 var numBallsPerTurn = 3;
@@ -8,6 +7,15 @@ var numBallTypes = 8;
 var numBallsToCompleteRow = 3;
 
 var numTurnsUntilNewBalls = 3;
+var headerHeight = 150;
+var gameBorderSize = 60;
+var gameAreaSize = 800;
+
+var scoreTextStyle = {
+    font: "bold 50px Arial",
+    fill: "green",
+    align: "center"
+};
 
 var colorMap = [
     0xFF0000,
@@ -39,30 +47,57 @@ var dirs = [
             0, 1
         ],
         [0, -1]
+    ],
+    [
+        [
+            -1, 1
+        ],
+        [1, -1]
     ]
 ];
 
 function FiveBalls(PIXI) {
     this.PIXI = PIXI;
     this.score = 0;
+    this.scoreSprite = null;
 
     this.init = function() {
         //Create the renderer
-        var renderer = PIXI.autoDetectRenderer(256, 256);
+        var renderer = PIXI.autoDetectRenderer(800, 800);
         document.body.appendChild(renderer.view);
         var stage = new PIXI.Container();
+        this.scoreContainer = new PIXI.Container();
+        this.gameContainer = new PIXI.Container();
+        this.upcomingContainer = new PIXI.Container();
         renderer.view.style.border = "1px dashed black";
 
-        var width = numCells * cellSize + 2 * borderSize;
-        var height = numCells * cellSize + 2 * borderSize;
+        // Setup game container
+        gameAreaSize = cellSize * numCells;
+        this.gameContainer.x = gameBorderSize
+        this.gameContainer.y = headerHeight + gameBorderSize
+        this.gameContainer.width = gameAreaSize;
+        this.gameContainer.height = gameAreaSize;
 
-        renderer.resize(width, height);
+        // Setup score container
+        this.scoreContainer.height = headerHeight;
+        this.scoreContainer.width = this.gameContainer.width;
+        this.scoreSprite = new PIXI.Text();
+        this.scoreSprite.x = gameBorderSize;
+        this.scoreSprite.y = gameBorderSize;
+        this.scoreSprite.setStyle(scoreTextStyle);
+        this.setScore(0);
+        this.scoreContainer.addChild(this.scoreSprite);
+
+        renderer.resize(gameBorderSize * 2 + gameAreaSize, gameBorderSize * 2 + gameAreaSize + headerHeight);
         renderer.backgroundColor = 0x223355;
         renderer.render(stage);
-        console.log("Starting game loop");
-        var board = new Board(stage);
-        board.init(stage);
 
+        var board = new Board(this.gameContainer);
+        board.init(this.gameContainer);
+
+        stage.addChild(this.gameContainer);
+        stage.addChild(this.scoreContainer);
+        stage.addChild(this.upcomingContainer);
         var gameLoop = function() {
             requestAnimationFrame(gameLoop);
             renderer.render(stage);
@@ -72,9 +107,14 @@ function FiveBalls(PIXI) {
 
         gameLoop();
     };
+
     this.addScore = function(numBalls) {
-        FiveBalls.score = FiveBalls.score + (numBalls) +  2*(numBalls - numBallsToCompleteRow)
-        console.log(FiveBalls.score);
+        FiveBalls.score = FiveBalls.score + (numBalls) + 2 * (numBalls - numBallsToCompleteRow)
+        this.setScore(FiveBalls.score);
+    }
+
+    this.setScore = function(score) {
+        this.scoreSprite.text = "Score : " + score;
     }
 
     function update() {};
@@ -150,8 +190,8 @@ function Board(stage) {
         var board = this;
         var tileSprite = new PIXI.Sprite(this.tileTexture);
         var tile = new Tile(x, y, tileSprite);
-        tileSprite.x = borderSize + x * cellSize;
-        tileSprite.y = borderSize + y * cellSize;
+        tileSprite.x = x * cellSize;
+        tileSprite.y = y * cellSize;
         tileSprite.interactive = true;
         tileSprite.on('mouseup', function(mousedata) {
             board.tileClicked(tile);
@@ -264,12 +304,10 @@ function Board(stage) {
         }
     }
 
-    
-
     this.getCoordsForCell = function(x, y) {
         return [
-            borderSize + x * cellSize,
-            borderSize + y * cellSize
+            x * cellSize,
+            y * cellSize
         ];
     }
 }
