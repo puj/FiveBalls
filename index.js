@@ -3,7 +3,7 @@ var app = express()
 
 
 app.get('/', function(req,res) {
-  res.sendfile('static/index.html');
+  res.sendfile('index.html');
 });
 
 app.use('/static', express.static('static'))
