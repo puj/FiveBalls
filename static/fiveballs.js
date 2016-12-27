@@ -163,8 +163,10 @@ function Board(stage) {
         var ball = this.ballMatrix[tile.x][tile.y];
         if (ball != null) {
             this.selectedBall = ball;
+            tile.select();
         } else {
             if (this.selectedBall) {
+                this.tileMatrix[this.selectedBall.x][this.selectedBall.y].deselect();
                 this.moveBall(this.selectedBall, tile.x, tile.y);
                 this.selectedBall = null;
                 this.numTurns = this.numTurns + 1;
@@ -203,6 +205,13 @@ function Tile(x, y, sprite) {
     this.x = x;
     this.y = y;
     this.sprite = sprite;
+
+    this.select = function() {
+        this.sprite.tint = 0x888888;
+    }
+    this.deselect = function() {
+        this.sprite.tint = 0xffffff;
+    }
 }
 
 function Ball(x, y, colorIndex, sprite) {
