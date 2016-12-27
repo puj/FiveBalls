@@ -5,6 +5,7 @@ var borderSize = 50;
 var numStartBalls = 10;
 var numBallsPerTurn = 3;
 var numBallTypes = 8;
+var numBallsToCompleteRow = 3;
 
 var numTurnsUntilNewBalls = 3;
 
@@ -20,8 +21,30 @@ var colorMap = [
     0x888800
 ];
 
+var dirs = [
+    [
+        [
+            1, 1
+        ],
+        [-1, -1]
+    ],
+    [
+        [
+            1, 0
+        ],
+        [-1, 0]
+    ],
+    [
+        [
+            0, 1
+        ],
+        [0, -1]
+    ]
+];
+
 function FiveBalls(PIXI) {
     this.PIXI = PIXI;
+    this.score = 0;
 
     this.init = function() {
         //Create the renderer
@@ -49,6 +72,10 @@ function FiveBalls(PIXI) {
 
         gameLoop();
     };
+    this.addScore = function(numBalls) {
+        FiveBalls.score = FiveBalls.score + (numBalls) +  2*(numBalls - numBallsToCompleteRow)
+        console.log(FiveBalls.score);
+    }
 
     function update() {};
     function render() {};
@@ -154,14 +181,16 @@ function Board(stage) {
     }
 
     this.removeBall = function(ball) {
-        this.stage.removeChild(ballSprite);
-        this.ballMatrix[ball.x,
-            ball.y] = null;
+        this.stage.removeChild(ball.sprite);
+        this.ballMatrix[ball.x][ball.y] = null;
     }
 
     this.tileClicked = function(tile) {
         var ball = this.ballMatrix[tile.x][tile.y];
         if (ball != null) {
+            if (this.selectedBall) {
+                this.tileMatrix[this.selectedBall.x][this.selectedBall.y].deselect();
+            }
             this.selectedBall = ball;
             tile.select();
         } else {
@@ -175,8 +204,50 @@ function Board(stage) {
         }
     }
 
+    this.inBounds = function(x, y) {
+        return x >= 0 && y >= 0 && x < numCells && y < numCells;
+    }
+
     this.checkNextTurnsConditions = function() {
         // Process 5+ in a row
+        for (var i = 0; i < numCells; i++) {
+            for (var j = 0; j < numCells; j++) {
+                var ball = this.ballMatrix[i][j];
+                if (ball == null) {
+                    continue;
+                }
+                for (var k = 0; k < dirs.length; k++) {
+                    var ballsInRow = [ball];
+                    for (var di = 0; di < 2; di++) {
+                        var countInDir = 1;
+                        while (true) {
+                            var newX = i + countInDir * dirs[k][di][0];
+                            var newY = j + countInDir * dirs[k][di][1];
+                            if (!this.inBounds(newX, newY)) {
+                                break;
+                            }
+
+                            var newBall = this.ballMatrix[newX][newY];
+                            if (newBall == null || newBall.colorIndex != ball.colorIndex) {
+                                break;
+                            }
+                            countInDir = countInDir + 1;
+
+                            ballsInRow.push(newBall);
+                        }
+
+                    }
+
+                    if (ballsInRow.length >= numBallsToCompleteRow) {
+                        for (var ii = 0; ii < ballsInRow.length; ii++) {
+                            this.removeBall(ballsInRow[ii]);
+                        }
+                        FiveBalls.addScore(ballsInRow.length);
+                    }
+                }
+            }
+        }
+
         // Get empties
         var empties = this.findOpenTiles();
 
@@ -192,6 +263,8 @@ function Board(stage) {
             this.createNewUpcoming();
         }
     }
+
+    
 
     this.getCoordsForCell = function(x, y) {
         return [
