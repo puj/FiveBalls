@@ -11,6 +11,9 @@ var headerHeight = 80;
 var gameBorderSize = 60;
 var gameAreaSize = 600;
 
+var movementThreshold = .5;
+var speed = 50;
+
 var dropballSound = "dropballSound";
 var clearSound = "clearSound";
 
@@ -123,7 +126,7 @@ function FiveBalls(PIXI) {
         var gameLoop = function() {
             requestAnimationFrame(gameLoop);
             renderer.render(stage);
-            update();
+            board.update();
             render();
         }
 
@@ -160,6 +163,8 @@ function Board(stage) {
     this.selectedBall = null;
     this.upcomingBallIndices = [];
     this.numTurns = 0;
+    this.currentTarget = null;
+
     this.init = function() {
         // Init tiles
         for (var i = 0; i < numCells; i++) {
@@ -186,6 +191,43 @@ function Board(stage) {
         }
 
         this.createNewUpcoming();
+    }
+
+    this.update = function() {
+        if (this.path == null || this.selectedBall == null) {
+            return;
+        }
+        console.log("Current target : " + this.currentTarget);
+        console.log("Selected ball : " + this.selectedBall);
+        this.currentTarget = this.path[0];
+
+        var dx = this.currentTarget.sprite.x - this.selectedBall.sprite.x;
+        var dy = this.currentTarget.sprite.y - this.selectedBall.sprite.y;
+        var length = Math.abs(dx) + Math.abs(dy);
+
+        if (length <= movementThreshold) {
+            this.path.shift();
+            if (this.path.length == 0) {
+                this.moveBall(this.selectedBall, this.currentTarget.x, this.currentTarget.y);
+                this.numTurns = this.numTurns + 1;
+                var clearedSomething = this.checkNextTurnsConditions();
+                if (clearedSomething) {
+                    FiveBalls.playSound(clearSound);
+
+                } else {
+                    FiveBalls.playSound(dropballSound);
+                }
+                this.selectedBall = null;
+                this.currentTarget = null;
+                this.path = null;
+            }
+
+        } else {
+            dx = dx / length;
+            dy = dy / length;
+            this.selectedBall.sprite.x += dx * speed;
+            this.selectedBall.sprite.y += dy * speed;
+        }
     }
 
     this.pickNRandomFrom = function(n, fromThis) {
@@ -260,6 +302,10 @@ function Board(stage) {
     }
 
     this.tileClicked = function(tile) {
+        if (this.currentTarget != null) {
+            return;
+        }
+
         var ball = this.ballMatrix[tile.x][tile.y];
         if (ball != null) {
             if (this.selectedBall) {
@@ -270,23 +316,11 @@ function Board(stage) {
         } else {
             if (this.selectedBall) {
                 var selectedTile = this.tileMatrix[this.selectedBall.x][this.selectedBall.y];
-                var path = this.findPath(selectedTile, tile);
+                this.path = this.findPath(selectedTile, tile);
 
                 selectedTile.deselect();
-                if(path == null){
-                  return;
-                }
-                
-                this.moveBall(this.selectedBall, tile.x, tile.y);
-                this.selectedBall = null;
-                this.numTurns = this.numTurns + 1;
-                var clearedSomething = this.checkNextTurnsConditions();
-                if (clearedSomething) {
-                    FiveBalls.playSound(clearSound);
-
-                } else {
-                    FiveBalls.playSound(dropballSound);
-
+                if (this.path == null) {
+                    return;
                 }
             }
         }
@@ -371,9 +405,9 @@ function Board(stage) {
                 if (!this.inBounds(newX, newY)) {
                     continue;
                 }
-                
-                if(this.ballMatrix[newX][newY] != null){
-                  continue;
+
+                if (this.ballMatrix[newX][newY] != null) {
+                    continue;
                 }
                 neighbors.push(this.tileMatrix[newX][newY]);
             }
