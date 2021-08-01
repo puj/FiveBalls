@@ -11,7 +11,7 @@ var headerHeight = 80;
 var gameBorderSize = 60;
 var gameAreaSize = 600;
 
-var movementThreshold = 0.5;
+var movementThreshold = 1;
 var speed = 50;
 
 var dropballSound = 'dropballSound';
@@ -55,9 +55,25 @@ function FiveBalls(PIXI) {
   this.ballTexture = new PIXI.Texture.fromImage('static/ball.png');
 
   this.init = function () {
+    // Get common dimensions
+
+    const height = window.innerHeight;
+    const width = window.innerWidth;
+    const dimension = Math.min(height, width);
+
     //Create the renderer
-    var renderer = PIXI.autoDetectRenderer(800, 800);
+    var renderer = PIXI.autoDetectRenderer(dimension, dimension);
     document.body.appendChild(renderer.view);
+
+    // Initial resize
+    gameAreaSize = dimension - gameBorderSize * 2;
+    cellSize = gameAreaSize / numCells;
+    movementThreshold = cellSize;
+    renderer.resize(
+      gameBorderSize * 2 + gameAreaSize,
+      gameBorderSize * 2 + gameAreaSize + headerHeight
+    );
+
     var stage = new PIXI.Container();
     this.scoreContainer = new PIXI.Container();
     this.gameContainer = new PIXI.Container();
@@ -90,23 +106,32 @@ function FiveBalls(PIXI) {
     this.upcomingBallSprites = [];
     for (var i = 0; i < 3; i++) {
       var ballSprite = new PIXI.Sprite(FiveBalls.ballTexture);
+      ballSprite.width = cellSize;
+      ballSprite.height = cellSize;
       ballSprite.x = i * cellSize;
       ballSprite.y = 0;
       this.upcomingContainer.addChild(ballSprite);
       this.upcomingBallSprites[i] = ballSprite;
     }
-
-    renderer.resize(
-      gameBorderSize * 2 + gameAreaSize,
-      gameBorderSize * 2 + gameAreaSize + headerHeight
-    );
     renderer.backgroundColor = 0x223355;
     renderer.render(stage);
 
     this.loadSounds();
 
     var board = new Board(this.gameContainer);
-    board.init(this.gameContainer);
+
+    const restoreData = JSON.parse(localStorage.getItem('fiveballs-save'));
+    if (restoreData) {
+      FiveBalls.score = restoreData.score;
+      this.setScore(FiveBalls.score);
+      board.restore(restoreData);
+
+      FiveBalls.upcomingBallSprites.forEach(
+        (sprite, i) => (sprite.tint = colorMap[board.upcomingBallIndices[i]])
+      );
+    } else {
+      board.init(this.gameContainer);
+    }
 
     stage.addChild(this.gameContainer);
     stage.addChild(this.scoreContainer);
@@ -114,7 +139,10 @@ function FiveBalls(PIXI) {
     var gameLoop = function () {
       requestAnimationFrame(gameLoop);
       renderer.render(stage);
-      board.update();
+      const moveFinished = board.update();
+      if (moveFinished) {
+        saveGame(board, FiveBalls.score);
+      }
       render();
     };
 
@@ -147,28 +175,44 @@ function FiveBalls(PIXI) {
 function Board(stage) {
   this.tileMatrix = new Array(numCells);
   this.ballMatrix = new Array(numCells);
-  this.ballPathMatrix = new Array(numCells);
   this.stage = stage;
   this.selectedBall = null;
   this.upcomingBallIndices = [];
   this.numTurns = 0;
   this.currentTarget = null;
 
-  this.init = function () {
+  this.restore = (restoreData) => {
+    this.initTiles();
+
+    for (var i = 0; i < numCells; i++) {
+      for (var j = 0; j < numCells; j++) {
+        const ballData = restoreData.ballData[i][j];
+        ballData && this.addBall(ballData.x, ballData.y, ballData.colorIndex);
+      }
+    }
+
+    this.upcomingBallIndices = restoreData.upcomingBallIndices;
+
+    this.numTurns = restoreData.numTurns;
+  };
+
+  this.initTiles = () => {
     // Init tiles
     for (var i = 0; i < numCells; i++) {
       this.tileMatrix[i] = new Array(numCells);
-      this.ballPathMatrix[i] = new Array(numCells);
       for (var j = 0; j < numCells; j++) {
-        this.ballPathMatrix[i][j] = 0;
         this.addTile(i, j);
       }
     }
 
-    // Init balls
+    // Clear balls
     for (var i = 0; i < numCells; i++) {
       this.ballMatrix[i] = new Array(numCells);
     }
+  };
+
+  this.init = function () {
+    this.initTiles();
 
     // Place first balls
     var emptyTiles = this.findOpenTiles();
@@ -186,8 +230,7 @@ function Board(stage) {
     if (this.path == null || this.selectedBall == null) {
       return;
     }
-    console.log('Current target : ' + this.currentTarget);
-    console.log('Selected ball : ' + this.selectedBall);
+
     this.currentTarget = this.path[0];
 
     var dx = this.currentTarget.sprite.x - this.selectedBall.sprite.x;
@@ -195,6 +238,9 @@ function Board(stage) {
     var length = Math.abs(dx) + Math.abs(dy);
 
     if (length <= movementThreshold) {
+      this.selectedBall.sprite.x = this.currentTarget.sprite.x;
+      this.selectedBall.sprite.y = this.currentTarget.sprite.y;
+
       this.path.shift();
       if (this.path.length == 0) {
         this.moveBall(
@@ -212,6 +258,8 @@ function Board(stage) {
         this.selectedBall = null;
         this.currentTarget = null;
         this.path = null;
+
+        return true;
       }
     } else {
       dx = dx / length;
@@ -257,6 +305,8 @@ function Board(stage) {
     var board = this;
     var tileSprite = new PIXI.Sprite(FiveBalls.tileTexture);
     var tile = new Tile(x, y, tileSprite);
+    tileSprite.width = cellSize;
+    tileSprite.height = cellSize;
     tileSprite.x = x * cellSize;
     tileSprite.y = y * cellSize;
     tileSprite.interactive = true;
@@ -273,6 +323,8 @@ function Board(stage) {
 
   this.addBall = function (x, y, colorIndex) {
     var ballSprite = new PIXI.Sprite(FiveBalls.ballTexture);
+    ballSprite.width = cellSize;
+    ballSprite.height = cellSize;
     ballSprite.x = this.getCoordsForCell(x, y)[0];
     ballSprite.y = this.getCoordsForCell(x, y)[1];
     ballSprite.tint = colorMap[colorIndex];
@@ -313,6 +365,7 @@ function Board(stage) {
         var selectedTile =
           this.tileMatrix[this.selectedBall.x][this.selectedBall.y];
         this.path = this.findPath(selectedTile, tile);
+        console.log(this.path);
 
         selectedTile.deselect();
         if (this.path == null) {
@@ -517,6 +570,29 @@ function Ball(x, y, colorIndex, sprite) {
   this.y = y;
   this.colorIndex = colorIndex;
   this.sprite = sprite;
-
-  //   this.onTouch = function (mouseEvent) {};
 }
+
+const saveGame = (board, score) => {
+  console.log('saving game');
+
+  const ballData = board.ballMatrix.map((row) =>
+    row.map((ball) => {
+      return (
+        ball && {
+          x: ball.x,
+          y: ball.y,
+          colorIndex: ball.colorIndex,
+        }
+      );
+    })
+  );
+
+  const saveData = {
+    ballData,
+    upcomingBallIndices: board.upcomingBallIndices,
+    numTurns: board.numTurns,
+    score,
+  };
+
+  localStorage.setItem('fiveballs-save', JSON.stringify(saveData));
+};
