@@ -78,6 +78,7 @@ function FiveBalls(PIXI) {
     this.scoreContainer = new PIXI.Container();
     this.gameContainer = new PIXI.Container();
     this.upcomingContainer = new PIXI.Container();
+    this.restartContainer = new PIXI.Container();
     renderer.view.style.border = '1px dashed black';
 
     // Setup game container
@@ -102,6 +103,26 @@ function FiveBalls(PIXI) {
     this.upcomingContainer.width = this.gameContainer.width;
     this.upcomingContainer.x = gameBorderSize + gameAreaSize / 2;
     this.upcomingContainer.y = gameBorderSize;
+
+    // Setup restart
+    this.restartContainer.height = headerHeight;
+    this.restartContainer.width = this.gameContainer.width;
+    this.restartContainer.x = gameAreaSize - gameBorderSize;
+    this.restartContainer.y = gameBorderSize;
+    this.restartContainer.interactive = true;
+    this.restartContainer.on('touchend', () => {
+      restartGame();
+    });
+    this.restartContainer.on('mouseup', () => {
+      restartGame();
+    });
+
+    const restartText = new PIXI.Text();
+    restartText.x = 0;
+    restartText.y = 0;
+    restartText.setStyle(scoreTextStyle);
+    restartText.text = 'Restart';
+    this.restartContainer.addChild(restartText);
 
     this.upcomingBallSprites = [];
     for (var i = 0; i < 3; i++) {
@@ -136,6 +157,7 @@ function FiveBalls(PIXI) {
     stage.addChild(this.gameContainer);
     stage.addChild(this.scoreContainer);
     stage.addChild(this.upcomingContainer);
+    stage.addChild(this.restartContainer);
     var gameLoop = function () {
       requestAnimationFrame(gameLoop);
       renderer.render(stage);
@@ -573,8 +595,6 @@ function Ball(x, y, colorIndex, sprite) {
 }
 
 const saveGame = (board, score) => {
-  console.log('saving game');
-
   const ballData = board.ballMatrix.map((row) =>
     row.map((ball) => {
       return (
@@ -595,4 +615,10 @@ const saveGame = (board, score) => {
   };
 
   localStorage.setItem('fiveballs-save', JSON.stringify(saveData));
+};
+
+const restartGame = () => {
+  console.log('Restarting game');
+  localStorage.removeItem('fiveballs-save');
+  location.reload();
 };
